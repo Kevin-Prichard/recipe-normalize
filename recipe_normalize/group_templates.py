@@ -10,7 +10,7 @@ import re
 lines = dd(list)
 split_rx = re.compile(r"\s+")
 parens_rx = re.compile(r".*[\(\)].*")
-with open("ingrs_uniq.txt", "r") as fh:
+with open("../ingrs_uniq.txt", "r") as fh:
     for line in fh.readlines():
         parens = 1 if parens_rx.match(line) else -1
         parts = split_rx.split(line)

@@ -13,7 +13,7 @@ token_rx = re.compile(f"({numerics})" + r"|(\w+)|\s+")
 
 lines = []
 commented_rx = re.compile(r"^\s*#")
-with open("ingrs_uniq.txt", "r") as fh:
+with open("../ingrs_uniq.txt", "r") as fh:
     for line in fh.readlines():
         if not commented_rx.match(line):
             lines.append(line)

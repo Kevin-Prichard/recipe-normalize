@@ -31,7 +31,7 @@ def hypernym_collector():
     words_covered = set()
 
     lines = []
-    with open("ingrs_uniq.txt", "r") as fh:
+    with open("../ingrs_uniq.txt", "r") as fh:
          for line in fh.readlines():
              lines.append(line)
 
@@ -108,10 +108,11 @@ def find_brandname_phrases():
             # if "betty crocker" in line.lower():  # "fruit roll ups" in line.lower() and
             #     import pudb; pu.db
             tokenized = [token for token in tokenize_ingr_line(
-                line, unknown, posify_words=False, skip_brandnames=False)]
+                line, unknown, substitute_pos=False, skip_brandnames=False)]
             ngrams = ngrammer(tokenized)
             for ngram in ngrams:
-                freq_map[" ".join(ngram)] += 1
+                freq_map[tuple(ngram)] += 1
+            # freq_map[" ".join(ngram)] += 1
     print(f"Overall {overall_count}, brandname {bn_count}, {bn_count/overall_count}")
     return freq_map
 
@@ -122,15 +123,22 @@ def count_ngrams():
     unknown = dd(int)
     bn_count = 0
     overall_count = 0
+    ach_rx = re.compile(f".*\Wh{mark_r}.*")
     from functools import reduce
     # import pudb; pu.db
     for line in lines:
+        if not brandname_rx.match(line):
+            continue
+        # if "h®" in line:
+        #    print(line[:-1])
+        # if overall_count > 100:
+        #     break
         overall_count += 1
         tokenized = [token for token in tokenize_ingr_line(
-            line, unknown, posify_words=False, skip_brandnames=False)]
+            line, unknown, substitute_pos=False, skip_brandnames=False)]
         ngrams = ngrammer(tokenized, keep_stopwords=True)
         for ngram in ngrams:
-            freq_map[" ".join(ngram)] += 1
+            freq_map[tuple(ngram)] += 1
         if brandname_rx.match(line):
             bn_count += 1
             # shortest_ng = reduce(ngram
@@ -138,10 +146,23 @@ def count_ngrams():
     return freq_map
 
 
+def fiddle():
+    n = ngrammer(["abc", "def", "ghi", "jkl", "mno"])
+    print(json.dumps(n))
+
+
 if __name__ == '__main__':
     # pos_collector(nounify_unknowns=True, countdown=False)
     # freqs = find_brandname_phrases()
+    # fiddle()
+
     freqs = count_ngrams()
+    brands = set()
     for ngram, cnt in freqs.items():
-        if brandname_rx.match(ngram):
-            print(f"{cnt}\t{ngram}")
+        if len(ngram) == 1 and brandname_rx.match(ngram[0]):
+            brands.add(ngram[0])
+
+             # print(f"{freqs[ngram]}\t{ngram}")
+    # for ngram, cnt in freqs.items():
+    #     if brandname_rx.match(ngram):
+    #         print(f"{cnt}\t{ngram}")
