@@ -21,23 +21,27 @@ mark_r = "\u00ae"
 mark_tm = "\u2122"
 brandname_rx = re.compile(f".*[{mark_r}{mark_tm}].*")
 hyp = lambda s: s.hypernyms()
+EMPTY_SET = set()
+EMPTY_TUPLE = tuple()
+EMPTY_LIST = list()
 
 
 class DocGramme:
     # Index of wordlike strings pointing to
-    _word_reg = dict()
-    _word_reg_last_id = 1
-    _gram_reg = dd(list)  # List[Tuple['DocGramme', int]])
+    _gram_ngram_map = dd(set)
+    _ngram_doc_map = dd(set)  # List[Tuple['DocGramme', int]])
+    _word_id_map = dict()
+    _word_last_id = 1
 
     def __init__(self, text, keep_stopwords=True):
         self._text = text
-        self._1grams = array('H')
-        self._grams = dict()
-        self.keep_stopwords = keep_stopwords
+        self._local_gram_id = array('H')
+        self._local_ngram_pos = dd(set)
+        self._keep_stopwords = keep_stopwords
         self._ingest_doc()
 
     def __hash__(self):
-        return hash(tuple(self._1grams))
+        return hash(tuple(self._local_gram_id))
 
     def _ingest_doc(self):
 
@@ -52,11 +56,11 @@ class DocGramme:
         useful_words = [
             word.lower()
             for word in raw_tokens
-            if word not in stopwords.words('english') or self.keep_stopwords]
+            if word not in stopwords.words('english') or self._keep_stopwords]
 
         # Turn tokens into word IDs
         for token in useful_words:
-            self._1grams.append(self._register_word(token))
+            self._local_gram_id.append(self._register_word(token))
 
         # Produce and register ngrams
         self._ngramify()
@@ -66,45 +70,59 @@ class DocGramme:
         # Also locally indexes ngrams, but unsure if that'll be useful (global index provides same, but across docs)
         min_n = 1
         max_n = 8
-        uwlen = len(self._1grams)
+        uwlen = len(self._local_gram_id)
         for i in range(0, uwlen - max(0, uwlen - max_n - 1)):
             for L in range(min_n, max_n + 1):
                 if i + L - 1 < uwlen:
-                    ngram_ptr = tuple(self._1grams[i:i + L])
-                    self._register_gram(ngram_ptr, i)
-                    x = self._grams.get(ngram_ptr, None)
-                    if x is not None:
-                        import pudb; pu.db
-                        raise Exception(f"Well that was weird: {ngram_ptr} in {self._text} double-existed")
-                    self._grams[ngram_ptr] = i
+                    ngram_ptr = tuple(self._local_gram_id[i:i + L])
+                    self._register_ngram(ngram_ptr)
+                    self._local_ngram_pos[ngram_ptr].add(i)
 
-    def _register_gram(self, ngram, local_idx):
-        self._gram_reg[ngram].append((self, local_idx))
+    def _register_ngram(self, ngram: Tuple[int]):
+        self._ngram_doc_map[ngram].add(self)
+        for gram in ngram:
+            self._gram_ngram_map[gram].add(ngram)
 
-    def _register_word(self, token) -> int:
-        tid = self._word_reg.get(token, None)
+    def _register_word(self, token: AnyStr) -> int:
+        tid = self._word_id_map.get(token, None)
         if tid is None:
-            self._word_reg[token] = tid = self._word_reg_last_id
-            self._word_reg_last_id += 1
+            self._word_id_map[token] = tid = self._word_last_id
+            self._word_last_id += 1
         return tid
 
-    """
-    Class Interface:
-        find(token): List[DocGramme]
-        by_ngram(ngram): array[Tuple[int]]
-        by_text(text)
-    """
+    @classmethod
+    def by_ngram(cls, ngram: Tuple[int]):
+        return cls._ngram_doc_map.get(ngram, None)
 
     @classmethod
-    def by_ngram(cls, ngram):
-        return cls._gram_reg.get(ngram, None)
+    def reconstitute(cls, ngram: Tuple[int], delim: AnyStr = ' ') -> AnyStr:
+        return delim.join(cls._word_id_map.get(gram, "??") for gram in ngram)
+
+    @classmethod
+    def longest_contiguous_common_ngrams(cls, gram: AnyStr) -> Set[tuple]:
+        word_id = cls._word_id_map.get(gram, None)
+        if word_id:
+            for ngram in cls._gram_ngram_map.get(word_id, EMPTY_TUPLE):
+                L = len(ngram)
+                P = len(cls._ngram_doc_map.get(ngram))
+                # unfinished
+
+    @classmethod
+    def by_term(cls, gram: AnyStr) -> Set['DocGramme']:
+        docset = set()
+        word_id = cls._word_id_map.get(gram.lower(), None)
+        if word_id:
+            ngrams = cls._gram_ngram_map.get(word_id, EMPTY_SET)
+            for ngram in ngrams:
+                docset.update(cls._ngram_doc_map.get(ngram, set()))
+        return docset
 
     @classmethod
     def by_terms(cls, tokens: Tuple[AnyStr]) -> Set['DocGramme']:
         # This is an and query
         queue = dict()
         for token in tokens:
-            queue[token] = cls._gram_reg.get((cls._word_reg.get(token, False),), [])
+            queue[token] = cls._ngram_doc_map.get((cls._word_id_map.get(token, False),), [])
 
         # Intersect the matching docs - doc must exist under all terms
         result = set()
