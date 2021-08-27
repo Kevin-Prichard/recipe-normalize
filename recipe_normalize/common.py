@@ -2,6 +2,7 @@ from collections import defaultdict as dd
 import nltk
 import re
 from typing import AnyStr, Union, List, Tuple, Set
+import typing as t
 nltk.download("stopwords")
 from nltk.corpus import stopwords, wordnet as wn
 import nltk
@@ -24,6 +25,92 @@ hyp = lambda s: s.hypernyms()
 EMPTY_SET = set()
 EMPTY_TUPLE = tuple()
 EMPTY_LIST = list()
+
+
+class T:
+    def __init__(self, text):
+        self._text = text
+    def __hash__(self):
+        return hash(self._text)
+    def __eq__(self, other):
+        if isinstance(other, T):
+            return self._text == other._text
+        return self._text == other
+    def __str__(self):
+        return f"T[{self._text}/{hash(self)}]"
+    __repr__ = __str__
+
+
+class Document:
+    # Static properties
+    _root = set()
+
+    class GramNode:
+        def __init__(self, gram_text, doc):
+            self._gram_text = gram_text
+            self._kids = set()
+            self._docs = set()
+            self._docs_count = 0
+            self._kids_count = 0
+
+        def __eq__(self, other):
+            if isinstance(other, Document.GramNode):
+                return self._gram_text == other._gram_text
+            return self._gram_text == other
+
+        def add(self, gram: 'GramNode', doc: 'Document'):
+            self._kids.add(gram)
+            self._docs.add(doc)
+            self._kids_count += 1
+            self._docs_count += 1
+            return gram
+
+        @property
+        def child_count(self):
+            return self._kids_count
+
+        @property
+        def doc_count(self):
+            return self._kids_count
+
+    def __init__(self, text, keep_stopwords=True):
+        self._text = text
+        self._keep_stopwords = keep_stopwords
+        self._grams = dict()
+        self._text_to_ngrams()
+
+    def __hash__(self):
+        return hash(self._text)
+
+    def _text_to_ngrams(self):
+        # Remove HTML tags prior to tokenizing
+        while '<' in self._text:
+            self._text = re.sub(HTML_TAG_RX, '', self._text)
+
+        # Everything wordlike is a token
+        raw_tokens = WORD_SPLIT.split(self._text)
+
+        # Remove noise words, if required
+        useful_words = [
+            word.lower()
+            for word in raw_tokens
+            if word not in stopwords.words('english') or self._keep_stopwords]
+
+        self._add_ngrams(useful_words)
+
+    def _add_ngrams(self, terms: t.Sized[AnyStr], max_depth: int = 8):
+        min_n = 1
+        max_n = 8
+        uwlen = len(terms)
+        for word_num in range(0, uwlen):
+            term = terms[word_num]
+            gram = self._root[term]
+            if not gram:
+                gram = self.GramNode(term, self)
+                self._root.add(gram)
+            for length in range(min_n, max_n):
+                if word_num + length < uwlen:
+                    gram = gram.add(self.GramNode(terms[word_num + length], self))
 
 
 class DocGramme:
@@ -101,11 +188,13 @@ class DocGramme:
     @classmethod
     def longest_contiguous_common_ngrams(cls, gram: AnyStr) -> Set[tuple]:
         word_id = cls._word_id_map.get(gram, None)
+        maxdocs = dd(set)
         if word_id:
             for ngram in cls._gram_ngram_map.get(word_id, EMPTY_TUPLE):
-                L = len(ngram)
-                P = len(cls._ngram_doc_map.get(ngram))
-                # unfinished
+                ngram_size = len(ngram)
+                ngram_docs = cls._ngram_doc_map.get(ngram, EMPTY_SET)
+                docs_having = len(ngram_docs)
+                maxdocs[ngram_size]
 
     @classmethod
     def by_term(cls, gram: AnyStr) -> Set['DocGramme']:

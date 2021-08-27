@@ -35,3 +35,4 @@ class TestDocGramme(TestCase):
         r = DocGramme.by_term("McCormick®")
         import pudb; pu.db
         d=1
+
