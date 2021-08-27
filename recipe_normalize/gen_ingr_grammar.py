@@ -19,6 +19,6 @@ with open("ingrs_test.txt", "r") as fh:
             lines.append(line)
 print(f"Lines {len(lines)}")
 
-import pudb; pu.db
+# import pudb; pu.db
 rg = grammar_induction.induce_grammar_using_template_trees(lines)
 print(json.dumps(json.loads(rg.to_json()), indent=4))

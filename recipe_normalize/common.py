@@ -1,7 +1,7 @@
 from collections import defaultdict as dd
 import nltk
 import re
-from typing import AnyStr, Union, List, Tuple, Set
+from typing import AnyStr, Union, List, Tuple, Set, Sequence
 nltk.download("stopwords")
 from nltk.corpus import stopwords, wordnet as wn
 import nltk
@@ -10,6 +10,9 @@ nltk.download('wordnet')
 from array import array
 from simple_classproperty import classproperty
 
+import logging
+logging.basicConfig()
+logger = logging.getLogger(__name__)
 
 WORD_SPLIT = re.compile(r'\s+')
 HTML_TAG_RX = re.compile(r'<[^<]+?>')
@@ -24,6 +27,55 @@ hyp = lambda s: s.hypernyms()
 EMPTY_SET = set()
 EMPTY_TUPLE = tuple()
 EMPTY_LIST = list()
+
+
+class TTuple:
+    def __init__(self, *args):
+        logger.warning("HEYYYYYYY")
+        self._kids = []
+        self._t = tuple(*args)  # has-a, not is-a, but we implement tuple's interface
+
+    def __iter__(self):
+        return self._t.__iter__()
+
+    def __len__(self):
+        return self._t.__len__()
+
+    def __getitem__(self, item):
+        logger.info("__getitem__(self, %s):", item)
+        return self._t.__getitem__(item)
+
+    def __getattr__(self, item):
+        logger.info("__getattr__(self, %s):", item)
+        return getattr(self._t, item)
+
+    def __getattribute__(self, item):
+        logger.info("__getattribute__(self, %s):", item)
+        return self._t.__getattribute__(item)
+
+    def where(self, other):
+        if not isinstance(other, Sequence):
+            return other in self._t
+        self_len = len(self._t)
+        other_len = len(other)
+        self_ptr = 0
+        other_ptr = 0
+        while self_ptr < self_len and other_ptr < other_len and (self_ptr + other_len <= self_len):
+            if other[other_ptr] == self._t[self_ptr + other_ptr]:
+                other_ptr += 1
+            else:
+                other_ptr = 0
+                self_ptr += 1
+        return self_ptr if other_ptr == other_len else None
+
+    def index(self, __value, __start, __stop):
+        return self._t.index(__value, __start, __stop)
+
+    def count(self, __value):
+        return self._t.count(__value)
+
+    def add_child(self, ttuple: 'TTuple'):
+        self._kids.append(ttuple)
 
 
 class DocGramme:
@@ -72,11 +124,16 @@ class DocGramme:
         max_n = 8
         uwlen = len(self._local_gram_id)
         for i in range(0, uwlen - max(0, uwlen - max_n - 1)):
+            ng_start = None
             for L in range(min_n, max_n + 1):
                 if i + L - 1 < uwlen:
-                    ngram_ptr = tuple(self._local_gram_id[i:i + L])
-                    self._register_ngram(ngram_ptr)
-                    self._local_ngram_pos[ngram_ptr].add(i)
+                    ngram = TTuple(self._local_gram_id[i:i + L])
+                    self._register_ngram(ngram)
+                    self._local_ngram_pos[ngram].add(i)
+                    if not ng_start:
+                        ng_start = ngram
+                    else:
+                        ng_start.add_child(ngram)
 
     def _register_ngram(self, ngram: Tuple[int]):
         self._ngram_doc_map[ngram].add(self)

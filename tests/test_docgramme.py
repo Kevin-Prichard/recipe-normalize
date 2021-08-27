@@ -1,6 +1,11 @@
-from recipe_normalize.common import DocGramme
-from unittest import TestCase
+import sys
 
+from recipe_normalize.common import DocGramme, TTuple
+from unittest import TestCase
+import logging
+
+logging.basicConfig()
+logger = logging.getLogger(__name__)
 
 
 doc_cocoa = '.563 cup unsweetened cocoa powder'
@@ -35,3 +40,17 @@ class TestDocGramme(TestCase):
         r = DocGramme.by_term("McCormick®")
         import pudb; pu.db
         d=1
+
+
+class TestTTuple(TestCase):
+    def test_that_ttuple_contains_works_for_sequences(self):
+        test_tup = TTuple([1, 2, 3, 4, 5, 6, 7])
+        test_sub = (4, 5, 6)
+        self.assertEqual(3, test_tup.where(test_sub), "Failed on first")
+        self.assertEqual(3, test_tup.where(test_sub), "Failed on second (state should be same")
+        self.assertEqual(4, test_tup.where((5,6,7)), "Failed on end")
+        test_tup_len = len(test_tup)
+        for i in range(test_tup_len):
+            for o in range(i, test_tup_len):
+                for p in range(o+1, test_tup_len-o):
+                    self.assertEqual(o, test_tup.where(test_tup[o:p]), f"Failed at: i={i}, o={o}, p={p}\n")
