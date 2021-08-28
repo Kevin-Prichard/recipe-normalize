@@ -29,53 +29,40 @@ EMPTY_TUPLE = tuple()
 EMPTY_LIST = list()
 
 
-class TTuple:
-    def __init__(self, *args):
-        logger.warning("HEYYYYYYY")
+# https://www.youtube.com/watch?v=ahkBExnJjdA
+# https://www.youtube.com/watch?v=In2f9-JQNqs
+
+class Ngram:
+    def __init__(self, seq: Sequence):
+        self._tup = tuple(seq)
         self._kids = []
-        self._t = tuple(*args)  # has-a, not is-a, but we implement tuple's interface
 
     def __iter__(self):
-        return self._t.__iter__()
+        return self._tup.__iter__()
 
-    def __len__(self):
-        return self._t.__len__()
+    def __hash__(self):
+        return hash(self._tup)
 
-    def __getitem__(self, item):
-        logger.info("__getitem__(self, %s):", item)
-        return self._t.__getitem__(item)
+    def __eq__(self, other):
+        return hash(self) == hash(other)
 
-    def __getattr__(self, item):
-        logger.info("__getattr__(self, %s):", item)
-        return getattr(self._t, item)
+    def add_child(self, child):
+        self._kids.append(child)
 
-    def __getattribute__(self, item):
-        logger.info("__getattribute__(self, %s):", item)
-        return self._t.__getattribute__(item)
-
-    def where(self, other):
+    def whereis(self, other):
         if not isinstance(other, Sequence):
-            return other in self._t
-        self_len = len(self._t)
+            return other in self._tup
+        self_len = len(self._tup)
         other_len = len(other)
         self_ptr = 0
         other_ptr = 0
         while self_ptr < self_len and other_ptr < other_len and (self_ptr + other_len <= self_len):
-            if other[other_ptr] == self._t[self_ptr + other_ptr]:
+            if other[other_ptr] == self._tup[self_ptr + other_ptr]:
                 other_ptr += 1
             else:
                 other_ptr = 0
                 self_ptr += 1
         return self_ptr if other_ptr == other_len else None
-
-    def index(self, __value, __start, __stop):
-        return self._t.index(__value, __start, __stop)
-
-    def count(self, __value):
-        return self._t.count(__value)
-
-    def add_child(self, ttuple: 'TTuple'):
-        self._kids.append(ttuple)
 
 
 class DocGramme:
@@ -127,7 +114,7 @@ class DocGramme:
             ng_start = None
             for L in range(min_n, max_n + 1):
                 if i + L - 1 < uwlen:
-                    ngram = TTuple(self._local_gram_id[i:i + L])
+                    ngram = Ngram(self._local_gram_id[i:i + L])
                     self._register_ngram(ngram)
                     self._local_ngram_pos[ngram].add(i)
                     if not ng_start:
@@ -135,7 +122,7 @@ class DocGramme:
                     else:
                         ng_start.add_child(ngram)
 
-    def _register_ngram(self, ngram: Tuple[int]):
+    def _register_ngram(self, ngram: Ngram):
         self._ngram_doc_map[ngram].add(self)
         for gram in ngram:
             self._gram_ngram_map[gram].add(ngram)
@@ -179,13 +166,13 @@ class DocGramme:
         # This is an and query
         queue = dict()
         for token in tokens:
+            token = token.lower()
             queue[token] = cls._ngram_doc_map.get((cls._word_id_map.get(token, False),), [])
 
         # Intersect the matching docs - doc must exist under all terms
         result = set()
         first_docset = True
-        for docs in queue.values():
-            docset = set(doc for doc, local_idx in docs)
+        for docset in queue.values():
             if first_docset:
                 result = docset
             else:

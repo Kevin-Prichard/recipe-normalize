@@ -1,6 +1,6 @@
 import sys
 
-from recipe_normalize.common import DocGramme, TTuple
+from recipe_normalize.common import DocGramme, Ngram
 from unittest import TestCase
 import logging
 
@@ -21,6 +21,7 @@ all_docs = [doc_cocoa, doc_lentils, doc_flour, doc_yeast, doc_marinade, doc_grav
 
 class TestDocGramme(TestCase):
     docset = [DocGramme(d) for d in all_docs]
+
     def beforeEach(self):
         self.docset = [DocGramme(d) for d in all_docs]
 
@@ -29,7 +30,9 @@ class TestDocGramme(TestCase):
         self.assertEqual(DocGramme.by_terms(('package',)), set([d]))
 
     def test_that_multiple_docs_same_terms_work(self):
-        self.assertEquals(len(DocGramme.by_terms(("McCormick®",))), 3)
+        import pudb; pu.db
+        logger.info("KcKs %d", len(DocGramme.by_terms(("McCormick®",))))
+        self.assertEqual(len(DocGramme.by_terms(("McCormick®",))), 3)
 
     def test__by_gram_search__returns_expected_docs(self):
         import pudb; pu.db
@@ -44,13 +47,13 @@ class TestDocGramme(TestCase):
 
 class TestTTuple(TestCase):
     def test_that_ttuple_contains_works_for_sequences(self):
-        test_tup = TTuple([1, 2, 3, 4, 5, 6, 7])
+        test_tup = make_gram([1, 2, 3, 4, 5, 6, 7])
         test_sub = (4, 5, 6)
-        self.assertEqual(3, test_tup.where(test_sub), "Failed on first")
-        self.assertEqual(3, test_tup.where(test_sub), "Failed on second (state should be same")
-        self.assertEqual(4, test_tup.where((5,6,7)), "Failed on end")
+        self.assertEqual(3, whereis(test_tup, test_sub), "Failed on first")
+        self.assertEqual(3, whereis(test_tup, test_sub), "Failed on second (state should be same")
+        self.assertEqual(4, whereis(test_tup, (5, 6, 7)), "Failed on end")
         test_tup_len = len(test_tup)
         for i in range(test_tup_len):
             for o in range(i, test_tup_len):
                 for p in range(o+1, test_tup_len-o):
-                    self.assertEqual(o, test_tup.where(test_tup[o:p]), f"Failed at: i={i}, o={o}, p={p}\n")
+                    self.assertEqual(o, whereis(test_tup, test_tup[o:p]), f"Failed at: i={i}, o={o}, p={p}\n")
