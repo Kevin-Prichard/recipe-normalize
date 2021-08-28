@@ -30,6 +30,7 @@ class TestDocGramme(TestCase):
         self.assertEqual(DocGramme.by_terms(('package',)), set([d]))
 
     def test_that_multiple_docs_same_terms_work(self):
+        d = DocGramme
         import pudb; pu.db
         logger.info("KcKs %d", len(DocGramme.by_terms(("McCormick®",))))
         self.assertEqual(len(DocGramme.by_terms(("McCormick®",))), 3)
@@ -40,8 +41,10 @@ class TestDocGramme(TestCase):
         d=1
 
     def test_fiddle(self):
-        r = DocGramme.by_term("McCormick®")
+        d = DocGramme
         import pudb; pu.db
+
+#        r = DocGramme.by_term("McCormick®")
         d=1
 
 

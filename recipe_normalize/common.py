@@ -46,6 +46,11 @@ class Ngram:
     def __eq__(self, other):
         return hash(self) == hash(other)
 
+    def __str__(self):
+        return " ".join(DocGramme.get_word(wid) for wid in self._tup)
+
+    __repr__ = __str__
+
     def add_child(self, child):
         self._kids.append(child)
 
@@ -79,6 +84,11 @@ class DocGramme:
         self._keep_stopwords = keep_stopwords
         self._ingest_doc()
 
+    @classmethod
+    def get_word(cls, word_id):
+        logger.warning(word_id)
+        return cls._word_id_map.get(word_id, "??")
+
     def __hash__(self):
         return hash(tuple(self._local_gram_id))
 
@@ -111,16 +121,15 @@ class DocGramme:
         max_n = 8
         uwlen = len(self._local_gram_id)
         for i in range(0, uwlen - max(0, uwlen - max_n - 1)):
-            ng_start = None
+            last_gram = None
             for L in range(min_n, max_n + 1):
                 if i + L - 1 < uwlen:
                     ngram = Ngram(self._local_gram_id[i:i + L])
                     self._register_ngram(ngram)
                     self._local_ngram_pos[ngram].add(i)
-                    if not ng_start:
-                        ng_start = ngram
-                    else:
-                        ng_start.add_child(ngram)
+                    if last_gram:
+                        last_gram.add_child(ngram)
+                    last_gram = ngram
 
     def _register_ngram(self, ngram: Ngram):
         self._ngram_doc_map[ngram].add(self)
