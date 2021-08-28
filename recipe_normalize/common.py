@@ -32,27 +32,50 @@ EMPTY_LIST = list()
 # https://www.youtube.com/watch?v=ahkBExnJjdA
 # https://www.youtube.com/watch?v=In2f9-JQNqs
 
-class Ngram:
-    def __init__(self, seq: Sequence):
-        self._tup = tuple(seq)
-        self._kids = []
+class NgramTreeNode:
+    _word_id_map = dict()
+    _word_last_id = 1
 
-    def __iter__(self):
-        return self._tup.__iter__()
+    def __init__(self, word: AnyStr):
+        self._word_id = self._register_word(word)
+        self._kids = set()
+        self._docs = set()
 
     def __hash__(self):
-        return hash(self._tup)
+        return self._word_id
 
-    def __eq__(self, other):
-        return hash(self) == hash(other)
+    def __eq__(self, other: Union['NgramTreeNode', AnyStr]):
+        if isinstance(AnyStr, other):
+            other_hash = self._word_id_map[other.lower()]
+        else:
+            other_hash = hash(other)
+        return hash(self) == other_hash
 
     def __str__(self):
-        return " ".join(DocGramme.get_word(wid) for wid in self._tup)
+        return self._word_id_map[self._word_id]
 
     __repr__ = __str__
 
-    def add_child(self, child):
-        self._kids.append(child)
+    def _register_word(self, token: AnyStr) -> int:
+        tid = self._word_id_map.get(token, None)
+        if tid is None:
+            self._word_id_map[token] = tid = self._word_last_id
+            self._word_last_id += 1
+        return tid
+
+    def add_child(self, child: 'NgramTreeNode'):
+        self._kids.add(child)
+
+    def add_doc(self, doc: 'DocGramme'):
+        self._docs.add(doc)
+
+
+class NgramTree:
+    _root = dict()
+
+    def add_ngram(self, word_seq: Sequence[AnyStr]):
+        for word in word_seq:
+            pass
 
     def whereis(self, other):
         if not isinstance(other, Sequence):
@@ -135,13 +158,6 @@ class DocGramme:
         self._ngram_doc_map[ngram].add(self)
         for gram in ngram:
             self._gram_ngram_map[gram].add(ngram)
-
-    def _register_word(self, token: AnyStr) -> int:
-        tid = self._word_id_map.get(token, None)
-        if tid is None:
-            self._word_id_map[token] = tid = self._word_last_id
-            self._word_last_id += 1
-        return tid
 
     @classmethod
     def by_ngram(cls, ngram: Tuple[int]):
