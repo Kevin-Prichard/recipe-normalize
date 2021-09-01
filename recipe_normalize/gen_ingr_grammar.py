@@ -4,6 +4,7 @@ from gitta import grammar_induction
 import json
 import random
 import re
+import sys
 import time
 random.seed(time.time())
 
@@ -11,14 +12,11 @@ random.seed(time.time())
 # https://github.com/twinters/gitta
 
 
-lines = []
-commented_rx = re.compile(r"^\s*#")
-with open("ingrs_test.txt", "r") as fh:
-    for line in fh.readlines():
-        if not commented_rx.match(line):
-            lines.append(line)
+from common import get_ingr_lines
+# lines = get_ingr_lines("mccormick.txt")
+lines = get_ingr_lines(sys.argv[1])
 print(f"Lines {len(lines)}")
 
-# import pudb; pu.db
+import pudb; pu.db
 rg = grammar_induction.induce_grammar_using_template_trees(lines)
 print(json.dumps(json.loads(rg.to_json()), indent=4))

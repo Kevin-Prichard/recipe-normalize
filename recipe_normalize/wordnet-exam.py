@@ -1,18 +1,42 @@
 #!/usr/bin/env python3
 
 from collections import defaultdict as dd
+import datetime as dt
 import json
 import logging
 import re
+import sys
 
+from walk_hn import counts
+from walk_hn import word_ancestry_finder, convert_ancestry_to_d3_hierarchy
 from common import get_ingr_lines, ngrammer, tokenize_ingr_line
 from common import (whitespace_parens_rx, wordlike_rx, numerics_rx, tags_rx,
-                    brandname_rx, mark_r, mark_tm)
+                    brandname_rx, mark_r, mark_tm,
+                    gen_ingr_words, gen_ingr_lines, IsAFood, IsAWord)
 
 from nltk.corpus import wordnet as wn
 
 logging.basicConfig()
 logger = logging.getLogger(__name__)
+
+POS = {
+    "n": "NOUN",
+    "v": "VERB",
+    "a": "ADJECTIVE",
+    "s": "ADJECTIVE",
+    "r": "ADVERB",
+}
+
+
+wnname = lambda x: x.name().split(".")[0]
+
+
+def flatten(toflatten):
+    for element in toflatten:
+        if isinstance(element, list):
+            yield from flatten(element)
+        else:
+            yield element
 
 
 def get_synsets_flattened(term, synsets=set()):
@@ -26,14 +50,9 @@ def get_synsets_flattened(term, synsets=set()):
     return synsets
 
 
-def hypernym_collector():
-    common_ancestors = dd(int)
+def hypernym_collector(lines):
+    comanc = dd(lambda: dd(int))
     words_covered = set()
-
-    lines = []
-    with open("../ingrs_uniq.txt", "r") as fh:
-         for line in fh.readlines():
-             lines.append(line)
 
     lineptr = 0
     print(f"Lines {len(lines)}")
@@ -51,14 +70,23 @@ def hypernym_collector():
                 continue
             # synsets = get_synsets_flattened(token)
             x = wn.synsets(token)
-            pu.db
-            synsets = set(sum(x, []))
+            synsets = set(flatten(x))
+            # synsets = set(sum(x, []))
+
             for syn in synsets:
-                common_ancestors[syn] += 1
+                hn = syn.hypernyms()
+                for idx, hyper in enumerate(hn):
+                    if synsets and hn:
+                        import pudb; pu.db
+                    comanc[POS[syn.pos()]][wnname(hyper)] += 1
             words_covered.add(token)
 
-    print(len(common_ancestors.keys()))
-    print(json.dumps(common_ancestors, indent=4, sort_keys=True))
+    print(len(comanc.keys()))
+    # print(json.dumps(comanc, indent=4, sort_keys=True))
+    # print("\n".join(f"{c}\t{k}" for k, c in comanc.items()))
+    print("\n".join(f"{c}\t{k1}\t{k2}"
+                    for k1, sub in comanc.items()
+                    for k2, c in sub.items()))
 
 
 def pos_collector(nounify_unknowns=False, countdown=True):
@@ -117,9 +145,9 @@ def find_brandname_phrases():
     return freq_map
 
 
-def count_ngrams():
+def count_ngrams(fn):
     freq_map = dd(int)
-    lines = get_ingr_lines()
+    lines = get_ingr_lines(fn)
     unknown = dd(int)
     bn_count = 0
     overall_count = 0
@@ -151,18 +179,129 @@ def fiddle():
     print(json.dumps(n))
 
 
+def inverted_hypernym_tree(fn):
+    r = word_ancestry_finder(gen_ingr_words(gen_ingr_lines(fn)))
+    tree = {"name": "__root__", "children": []}
+    convert_ancestry_to_d3_hierarchy(r, tree)
+    print(json.dumps(tree, indent=2, sort_keys=True))
+
+
+def word_food_histogram(input_fn="ingrs_uniq_dequantified.txt",
+                        uniq_food_out_fn="uniq_food.txt",
+                        uniq_nonfood_out_fn="uniq_nonfood.txt",
+                        uniq_unknown_out_fn="uniq_unknown.txt",
+                        more_food_hypernyms=None):
+    isafood = IsAFood(more_food_hypernyms)
+    isaword = IsAWord()
+    line_words_histo = dd(int)
+    line_foods_histo = dd(int)
+    line_unknown_histo = dd(int)
+    line_count = 0
+    word_count = 0
+    nonfood_count = 0
+    food_count = 0
+    unknown_count = 0
+    uniq_nonfood = set()
+    uniq_food = set()
+    uniq_unknown = set()
+    for line in gen_ingr_lines(input_fn):
+    # for line in ["abcdefasdfasdfa"]:
+        line_count += 1
+        line_word_count = 0
+        line_food_count = 0
+        line_unknown_count = 0
+        for word in gen_ingr_words([line]):
+        # for word in [line]:
+            word_count += 1
+            line_word_count += 1
+            if word in isafood:
+                uniq_food.add(word)
+                food_count += 1
+                line_food_count += 1
+            elif word in isaword:
+                nonfood_count += 1
+                uniq_nonfood.add(word)
+            else:
+                uniq_unknown.add(word)
+                unknown_count += 1
+                line_unknown_count += 1
+        line_words_histo[line_word_count] += 1
+        line_foods_histo[line_food_count] += 1
+        line_unknown_histo[line_unknown_count] += 1
+
+    uniq_all = len(uniq_nonfood) + len(uniq_food) + len(uniq_unknown)
+    print(f"Ingr lines unique: {line_count}")
+    print(f"All words: {word_count}, "
+          f"Food words: {food_count}, "
+          f"Food% {int(food_count/word_count*10000)/100}%, "
+          f"Nonfood words: {nonfood_count}, "
+          f"Nonwords: {unknown_count}, "
+          f"Nonwords% {int(unknown_count/word_count*10000)/100}%")
+    print(f"Unique words- "
+          f"All: {uniq_all}, "
+          f"Nonfood: {len(uniq_nonfood)}, "
+          f"Food: {len(uniq_food)}, "
+          f"Food% "
+          f"{int(len(uniq_food)/max(1, uniq_all)*10000)/100}%, "
+          f"Nonword: {len(uniq_unknown)}, "
+          f"Nonword% "
+          f"{int(len(uniq_unknown)/max(1, uniq_all)*10000)/100}%")
+    print("== Dictionary words Per Line Histo ==")
+    for wpl in sorted(line_words_histo.keys()):
+        print(f"{wpl}\t{line_words_histo[wpl]}")
+    print("== Food words Per Line Histo ==")
+    for fpl in sorted(line_foods_histo.keys()):
+        print(f"{fpl}\t{line_foods_histo[fpl]}")
+    print("== Unknown words Per Line Histo ==")
+    for fpl in sorted(line_unknown_histo.keys()):
+        print(f"{fpl}\t{line_unknown_histo[fpl]}")
+    foods = "\n".join(sorted(uniq_food))
+    words = "\n".join(sorted(uniq_nonfood))
+    unknown = "\n".join(sorted(uniq_unknown))
+    with open(uniq_food_out_fn, "w") as fh:
+        fh.write(foods)
+    with open(uniq_nonfood_out_fn, "w") as fh:
+        fh.write(words)
+    with open(uniq_unknown_out_fn, "w") as fh:
+        fh.write(unknown)
+    # print("=" * 80)
+    # print(foods)
+    # print("=" * 80)
+    # print(words)
+
+
 if __name__ == '__main__':
     # pos_collector(nounify_unknowns=True, countdown=False)
     # freqs = find_brandname_phrases()
     # fiddle()
-
-    freqs = count_ngrams()
+    """
+    lines = get_ingr_lines(sys.argv[1])
+    hypernym_collector(lines)
+    """
+    # import pudb; pu.db
+    """
+    freqs = count_ngrams("mccormick.txt")
     brands = set()
     for ngram, cnt in freqs.items():
-        if len(ngram) == 1 and brandname_rx.match(ngram[0]):
-            brands.add(ngram[0])
+        print(f"{cnt}\t{ngram}")
+    """
+    try:
+        # inverted_hypernym_tree("ingrs_uniq_dequantified.txt")
 
-             # print(f"{freqs[ngram]}\t{ngram}")
-    # for ngram, cnt in freqs.items():
-    #     if brandname_rx.match(ngram):
-    #         print(f"{cnt}\t{ngram}")
+        # r = word_ancestry_finder(gen_ingr_words(gen_ingr_lines("ingrs_uniq_dequantified.txt")))
+        # print(json.dumps(counts, indent=2, sort_keys=True))
+
+        # word_food_histogram("ingrs_uniq_dequantified.txt")
+        food_hyn = [
+            'food.n.01', 'food.n.02', 'organism.n.01', 'plant_part.n.01',
+            'living_thing.n.01',
+        ]
+        fn_suffix = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+        word_food_histogram(#"uniq_word2.txt",
+                            uniq_food_out_fn=f"uniq_food_{fn_suffix}.txt",
+                            uniq_nonfood_out_fn=f"uniq_nonfood_{fn_suffix}.txt",
+                            uniq_unknown_out_fn=f"uniq_unknown_{fn_suffix}.txt",
+                            more_food_hypernyms=food_hyn)
+    except BaseException as e:
+        import pudb; pu.db
+        d = 1

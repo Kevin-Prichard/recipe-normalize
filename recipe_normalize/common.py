@@ -2,10 +2,14 @@ from collections import defaultdict as dd
 import nltk
 import re
 from typing import AnyStr, Union, List, Tuple, Set, Sequence
+import typing as t
 nltk.download("stopwords")
 from nltk.corpus import stopwords, wordnet as wn
+from nltk.stem.snowball import EnglishStemmer
 import nltk
 nltk.download('wordnet')
+
+stemmer = EnglishStemmer(ignore_stopwords=True)
 
 from array import array
 from simple_classproperty import classproperty
@@ -14,7 +18,6 @@ import logging
 logging.basicConfig()
 logger = logging.getLogger(__name__)
 
-WORD_SPLIT = re.compile(r'\s+')
 HTML_TAG_RX = re.compile(r'<[^<]+?>')
 whitespace_parens_rx = re.compile(r"[ \t\n\r(),.;:\"?!@#$\^&*_=+]+")
 wordlike_rx = re.compile(r"\w+")
@@ -23,6 +26,8 @@ tags_rx = re.compile(r'<[^<]+?>')
 mark_r = "\u00ae"
 mark_tm = "\u2122"
 brandname_rx = re.compile(f".*[{mark_r}{mark_tm}].*")
+WORD_SPLIT = re.compile(r"[^\w+_'" + mark_r + mark_tm + r"]+")
+# WORD_SPLIT = re.compile(r'\s+')
 hyp = lambda s: s.hypernyms()
 EMPTY_SET = set()
 EMPTY_TUPLE = tuple()
@@ -31,6 +36,10 @@ EMPTY_LIST = list()
 
 # https://www.youtube.com/watch?v=ahkBExnJjdA
 # https://www.youtube.com/watch?v=In2f9-JQNqs
+
+class Ngram:  # here just to satisfy old deps
+    pass
+
 
 class NgramTreeNode:
     _word_id_map = dict()
@@ -243,17 +252,55 @@ def ngrammer(
     return n_grams
 
 
-def get_ingr_lines():
+def get_ingr_lines(fn):
     lines = []
-    with open("../ingrs_uniq.txt", "r") as fh:
+    with open(fn, "r") as fh:
         for line in fh.readlines():
             while '<' in line:
                 line = re.sub(r'<[^<]+?>', '', line)
-            lines.append(line)
+            lines.append(line.strip())
     return lines
 
 
-def tokenize_ingr_line(line, unknown:List[AnyStr]=None, substitute_pos=True, skip_brandnames=True):
+def gen_ingr_lines(fn):
+    lines = []
+    c = 0
+    with open(fn, "r") as fh:
+        for line in fh.readlines():
+            c += 1
+            # if c > 10:
+            #     break
+            while '<' in line:
+                line = re.sub(r'<[^<]+?>', '', line)
+            yield line.strip()
+
+
+def gen_ingr_words(lines_gen):
+    for line in lines_gen:
+        # Remove HTML tags prior to tokenizing
+        while '<' in line:
+            line = re.sub(HTML_TAG_RX, '', line)
+
+        # Everything wordlike is a token
+        raw_tokens = WORD_SPLIT.split(line)
+
+        # Remove noise words, if required
+        useful_words = [
+            # stemmer.stem(word.lower())
+            word.lower()
+            for word in raw_tokens
+            if word not in stopwords.words('english')]
+        if "hamburger" in line and "hamburg" in useful_words:
+            import pudb; pu.db
+
+        # Turn tokens into word IDs
+        for token in useful_words:
+            yield token
+
+
+def tokenize_ingr_line(line, unknown:t.Dict[AnyStr, int]=None,
+                       substitute_pos=True,
+                       skip_brandnames=True):
     tokens = whitespace_parens_rx.split(line.lower())
     # import pudb; pu.db
     for token in tokens:
@@ -275,3 +322,32 @@ def tokenize_ingr_line(line, unknown:List[AnyStr]=None, substitute_pos=True, ski
                     yield f"<n>"
             else:
                 yield token
+
+
+class IsAFood:
+    def __init__(self, match_hypernyms: t.Iterable, min_depth=0):
+        self._match_hypernyms = match_hypernyms
+        self._cache = dd(bool)
+
+    def __contains__(self, word):
+        # if word == 'adobo':
+        #     import pudb; pu.db
+        if word not in self._cache:
+            wordset = wn.synsets(word)
+            for term in wordset:
+                self._cache[word] |= self._hn_visit(term)
+        return self._cache[word]
+
+    def _hn_visit(self, syn, depth=0):
+        hyns = syn.hypernyms()
+        result = False
+        for hyn in hyns:
+            if hyn.name() in self._match_hypernyms:
+                return True
+            result |= self._hn_visit(hyn, depth=depth + 1)
+        return result
+
+
+class IsAWord:
+    def __contains__(self, word):
+        return len(wn.synsets(word)) > 0
