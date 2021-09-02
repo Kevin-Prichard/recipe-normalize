@@ -26,6 +26,7 @@ tags_rx = re.compile(r'<[^<]+?>')
 mark_r = "\u00ae"
 mark_tm = "\u2122"
 brandname_rx = re.compile(f".*[{mark_r}{mark_tm}].*")
+brandname_strip_rx = re.compile(f"([^{mark_r}{mark_tm}]+)[{mark_r}{mark_tm}]")
 WORD_SPLIT = re.compile(r"[^\w+_'" + mark_r + mark_tm + r"]+")
 # WORD_SPLIT = re.compile(r'\s+')
 hyp = lambda s: s.hypernyms()

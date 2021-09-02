@@ -11,7 +11,7 @@ from walk_hn import counts
 from walk_hn import word_ancestry_finder, convert_ancestry_to_d3_hierarchy
 from common import get_ingr_lines, ngrammer, tokenize_ingr_line
 from common import (whitespace_parens_rx, wordlike_rx, numerics_rx, tags_rx,
-                    brandname_rx, mark_r, mark_tm,
+                    brandname_rx, mark_r, mark_tm, brandname_strip_rx,
                     gen_ingr_words, gen_ingr_lines, IsAFood, IsAWord)
 
 from nltk.corpus import wordnet as wn
@@ -270,6 +270,26 @@ def word_food_histogram(input_fn="ingrs_uniq_dequantified.txt",
     # print(words)
 
 
+def brandname_lexicon(input_fn="ingrs_uniq_dequantified.txt"):
+    line_count = 0
+    isafood = IsAFood(match_hypernyms=[
+        'food.n.01', 'food.n.02', 'organism.n.01', 'plant_part.n.01',
+        'living_thing.n.01',
+    ])
+    lex = set()
+    for line in gen_ingr_lines(input_fn):
+        line_count += 1
+        for word in gen_ingr_words([line.lower()]):
+            brandname_match = brandname_strip_rx.match(word)
+            if brandname_match:
+                brand_word = brandname_match.group(1)
+                if brand_word not in isafood:
+                    lex.add(brand_word)
+    with open("brandname_lexicon.txt", "w") as fh:
+        fh.write("\n".join(sorted(lex)))
+    return lex
+
+
 if __name__ == '__main__':
     # pos_collector(nounify_unknowns=True, countdown=False)
     # freqs = find_brandname_phrases()
@@ -291,7 +311,12 @@ if __name__ == '__main__':
         # r = word_ancestry_finder(gen_ingr_words(gen_ingr_lines("ingrs_uniq_dequantified.txt")))
         # print(json.dumps(counts, indent=2, sort_keys=True))
 
-        # word_food_histogram("ingrs_uniq_dequantified.txt")
+        brandname_lexicon()
+
+        """
+        # Feat: lookup ingredient words in wordnet, determine if food or nonfood
+        # or unknown word (typos, brandnames), then write to those 3 files,
+        # and gen histograms of each.
         food_hyn = [
             'food.n.01', 'food.n.02', 'organism.n.01', 'plant_part.n.01',
             'living_thing.n.01',
@@ -302,6 +327,7 @@ if __name__ == '__main__':
                             uniq_nonfood_out_fn=f"uniq_nonfood_{fn_suffix}.txt",
                             uniq_unknown_out_fn=f"uniq_unknown_{fn_suffix}.txt",
                             more_food_hypernyms=food_hyn)
+        """
     except BaseException as e:
         import pudb; pu.db
         d = 1
