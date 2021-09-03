@@ -1,0 +1,52 @@
+Ingr lines unique: 48900
+All words: 348102, Food words: 114374, Food% 32.85%, Nonfood words: 110924, Nonwords: 122804, Nonwords% 35.27%
+Unique words- All: 4978, Nonfood: 1689, Food: 1536, Food% 30.85%, Nonword: 1753, Nonword% 35.21%
+== Dictionary words Per Line Histo ==
+3	113
+4	1770
+5	8156
+6	12221
+7	9712
+8	6607
+9	4444
+10	2587
+11	1588
+12	826
+13	395
+14	235
+15	104
+16	57
+17	26
+18	25
+19	14
+20	8
+21	4
+22	1
+23	4
+24	1
+25	1
+29	1
+== Food words Per Line Histo ==
+0	515
+1	11079
+2	17867
+3	12773
+4	4811
+5	1387
+6	318
+7	95
+8	30
+9	11
+10	8
+11	5
+16	1
+== Unknown words Per Line Histo ==
+2	31450
+3	12147
+4	3588
+5	1292
+6	336
+7	68
+8	15
+9	3
+12	1

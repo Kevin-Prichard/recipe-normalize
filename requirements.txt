@@ -1,0 +1,6 @@
+pymongo==3.12.0
+simple-classproperty==1.3.2
+pudb
+nltk
+pytest
+pytest-pudb
