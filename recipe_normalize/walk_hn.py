@@ -5,8 +5,9 @@ from nltk.corpus import wordnet as wn
 import json
 
 
-
 """
+In convert_ancestry_to_d3_hierarchy() we are concerned with converting this
+straightforward hierarchy of counts...
     {
         "key1": {
             "key11": {
@@ -24,7 +25,7 @@ import json
             ...
         }
     }
-
+...into this similar structure which d3.hierarchy() expects...
     {
         "name": "root",
         "children": [
@@ -49,45 +50,6 @@ import json
 
 """
 
-# next_nutree = nutree.get("children")
-# if next_nutree is None:
-#     nutree["children"] = next_nutree = {"name": key, "children": {}}
-
-
-"""
-def convert_ancestry_to_d3_hierarchy(tree, nutree):
-    for key, subtree_or_value in tree.items():
-        if key != 'value' and isinstance(subtree_or_value, dict):
-            next_nutree = {"name": key, "children": []}
-            nutree["children"].append(next_nutree)
-            convert_ancestry_to_d3_hierarchy(subtree_or_value, next_nutree)
-        elif key == 'value':
-            nutree["value"] = subtree_or_value
-            # nutree["children"].append({"name": key, "value": subtree_or_value})
-        else:
-            print(f"Error: {key}->{subtree_or_value}")
-
-
-
-
-def convert_ancestry_to_d3_hierarchy(tree, nutree):
-    for key, subtree_or_value in tree.items():
-        # if "children" not in nutree:
-        #     nutree["children"] = {}
-        if key != '__value__' and isinstance(subtree_or_value, dict):
-            next_nutree = {"name": key, "children": []}
-            if "children" not in nutree:
-                import pudb; pu.db
-            nutree["children"].append(next_nutree)
-            convert_ancestry_to_d3_hierarchy(subtree_or_value, next_nutree)
-        elif key == '__value__':
-            nutree["value"] = subtree_or_value
-            del nutree["children"]
-            # nutree["children"].append({"name": key, "value": subtree_or_value})
-        else:
-            print(f"Error: {key}->{subtree_or_value}")
-
-"""
 
 counts = dd(int)
 
@@ -137,7 +99,7 @@ def convert_ancestry_to_d3_hierarchy(tree, nutree):
     if "children" not in nutree:
         nutree["children"] = []
     for key, subtree_or_value in tree.items():
-        if key == '__value__':
+        if key == "__value__":
             nutree["value"] = subtree_or_value
             del nutree["children"]
             break
@@ -147,9 +109,19 @@ def convert_ancestry_to_d3_hierarchy(tree, nutree):
 
 
 def main():
+    # A rough experiment to produce a tree in the d3.hierarchy() format
     def word_gen():
-        words=["23", "twenty-four", "three", "hamburger",
-               "carrot", "fresh", "chopped", "golden", "toasted"]
+        words = [
+            "23",
+            "twenty-four",
+            "three",
+            "hamburger",
+            "carrot",
+            "fresh",
+            "chopped",
+            "golden",
+            "toasted",
+        ]
         for word in words:
             yield word
 
